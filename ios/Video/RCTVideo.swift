@@ -8,7 +8,7 @@ import React
 
 // MARK: - RCTVideo
 
-class RCTVideo: UIView, RCTVideoPlayerViewControllerDelegate, RCTPlayerObserverHandler {
+class RCTVideo: UIView, RCTVideoPlayerViewControllerDelegate, RCTPlayerObserverHandler, AVPlayerItemMetadataCollectorPushDelegate {
     private var _player: AVPlayer?
     private var _playerItem: AVPlayerItem?
     private var _source: VideoSource?
@@ -403,6 +403,25 @@ class RCTVideo: UIView, RCTVideoPlayerViewControllerDelegate, RCTPlayerObserverH
         }
     }
 
+    var metadataCollector: AVPlayerItemMetadataCollector!
+    func metadataCollector(_ metadataCollector: AVPlayerItemMetadataCollector,
+                        didCollect metadataGroups: [AVDateRangeMetadataGroup],
+                        indexesOfNewGroups: IndexSet,
+                        indexesOfModifiedGroups: IndexSet) {
+        print(metadataGroups)
+        for metaDataGroup in metadataGroups {
+            for metadataitem in metaDataGroup.items {
+                onTimedMetadata?([
+                    "startDate": metaDataGroup.startDate.timeIntervalSince1970,
+                    "metadata": [[
+                        "identifier": metadataitem.key,
+                        "value": metadataitem.value,
+                    ]]
+                ])
+            }
+        }
+    }
+
     // MARK: - Player and source
 
     func preparePlayerItem() async throws -> AVPlayerItem {
@@ -479,6 +498,10 @@ class RCTVideo: UIView, RCTVideoPlayerViewControllerDelegate, RCTPlayerObserverH
             DebugLog("setSrc has been canceled last step")
             return
         }
+
+        metadataCollector = AVPlayerItemMetadataCollector()
+        metadataCollector.setDelegate(self, queue: DispatchQueue.main)
+        playerItem.add(metadataCollector)
 
         _player?.pause()
         _playerItem = playerItem

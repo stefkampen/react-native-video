@@ -101,6 +101,7 @@ import androidx.media3.extractor.metadata.id3.TextInformationFrame;
 import androidx.media3.session.MediaSessionService;
 import androidx.media3.ui.DefaultTimeBar;
 import androidx.media3.ui.LegacyPlayerControlView;
+import androidx.media3.exoplayer.hls.HlsManifest;
 
 import com.brentvatne.common.api.BufferConfig;
 import com.brentvatne.common.api.BufferingStrategy;
@@ -1726,6 +1727,34 @@ public class ReactExoplayerView extends FrameLayout implements
     @Override
     public void onTimelineChanged(@NonNull Timeline timeline, int reason) {
         // Do nothing.
+        Object manifest = player.getCurrentManifest();
+        if(manifest == null){
+             return;
+         }
+         try {
+             String convertedToString = String.valueOf(manifest);
+             HlsManifest hlsManifest = (HlsManifest) manifest;
+             ArrayList<TimedMetadata> metadataArray = new ArrayList<>();
+             for (String arg : hlsManifest.mediaPlaylist.tags) {
+                for (String splitted : arg.split(",")) {
+                    if (splitted.split(":", 2).length > 1) {
+                        String[] splittedSplit = splitted.split(":", 2);
+                        TimedMetadata timedMetadata = new TimedMetadata(splittedSplit[0], splittedSplit[1]);
+                        metadataArray.add(timedMetadata);
+                    } else if (splitted.split("=", 2).length > 1) {
+                        String[] splittedSplit = splitted.split("=", 2);
+                        TimedMetadata timedMetadata = new TimedMetadata(splittedSplit[0], splittedSplit[1]);
+                        metadataArray.add(timedMetadata);
+                    } else {
+                        TimedMetadata timedMetadata = new TimedMetadata("", splitted);
+                        metadataArray.add(timedMetadata);
+                    }
+                }
+             }
+             eventEmitter.onTimedMetadata.invoke(metadataArray);
+         } catch(Exception e) {
+             e.printStackTrace();
+         } 
     }
 
     @Override
