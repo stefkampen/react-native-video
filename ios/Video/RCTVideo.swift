@@ -264,11 +264,6 @@ class RCTVideo: UIView, RCTVideoPlayerViewControllerDelegate, RCTPlayerObserverH
     }
 
     deinit {
-        #if USE_GOOGLE_IMA
-            _imaAdsManager.releaseAds()
-            _imaAdsManager = nil
-        #endif
-
         NotificationCenter.default.removeObserver(self)
         self.removePlayerLayer()
         _playerObserver.clearPlayer()
@@ -554,7 +549,8 @@ class RCTVideo: UIView, RCTVideoPlayerViewControllerDelegate, RCTPlayerObserverH
                 // Set up your content playhead and contentComplete callback.
                 _contentPlayhead = IMAAVPlayerContentPlayhead(avPlayer: _player!)
 
-                _imaAdsManager.setUpAdsLoader()
+                _imaAdsManager?.setUpAdsLoader()
+                _didRequestAds = false
             }
         #endif
         isSetSourceOngoing = false
@@ -960,7 +956,9 @@ class RCTVideo: UIView, RCTVideoPlayerViewControllerDelegate, RCTPlayerObserverH
         setResizeMode(_resizeMode)
         setRepeat(_repeat)
         setControls(_controls)
-        setPaused(_paused)
+        #if !USE_GOOGLE_IMA
+            setPaused(_paused)
+        #endif
         setAllowsExternalPlayback(_allowsExternalPlayback)
     }
 
@@ -1333,6 +1331,14 @@ class RCTVideo: UIView, RCTVideoPlayerViewControllerDelegate, RCTPlayerObserverH
         // swiftlint:disable:next notification_center_detachment
         NotificationCenter.default.removeObserver(self)
 
+        
+        #if USE_GOOGLE_IMA
+            _imaAdsManager?.releaseAds()
+            _imaAdsManager = nil
+        #endif
+
+        ReactNativeVideoManager.shared.unregisterView(newInstance: self)
+            
         super.removeFromSuperview()
     }
 
@@ -1483,6 +1489,12 @@ class RCTVideo: UIView, RCTVideoPlayerViewControllerDelegate, RCTPlayerObserverH
             self._videoLoadStarted = false
             self._playerObserver.attachPlayerEventListeners()
             self.applyModifiers()
+            #if USE_GOOGLE_IMA
+                if !_didRequestAds && _adTagUrl != nil {
+                    _imaAdsManager.requestAds()
+                    _didRequestAds = true
+                }
+            #endif
         }
     }
 
