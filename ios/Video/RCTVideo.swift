@@ -8,7 +8,7 @@ import React
 
 // MARK: - RCTVideo
 
-class RCTVideo: UIView, RCTVideoPlayerViewControllerDelegate, RCTPlayerObserverHandler {
+class RCTVideo: UIView, RCTVideoPlayerViewControllerDelegate, RCTPlayerObserverHandler, AVPlayerItemMetadataCollectorPushDelegate {
     var _player: AVPlayer?
     private var _playerItem: AVPlayerItem?
     private var _source: VideoSource?
@@ -286,7 +286,7 @@ class RCTVideo: UIView, RCTVideoPlayerViewControllerDelegate, RCTPlayerObserverH
 
     deinit {
         #if USE_GOOGLE_IMA
-            _imaAdsManager.releaseAds()
+            _imaAdsManager?.releaseAds()
             _imaAdsManager = nil
         #endif
         AudioSessionManager.shared.unregisterView(view: self)
@@ -471,6 +471,25 @@ class RCTVideo: UIView, RCTVideoPlayerViewControllerDelegate, RCTPlayerObserverH
         }
     }
 
+    var metadataCollector: AVPlayerItemMetadataCollector!
+    func metadataCollector(_ metadataCollector: AVPlayerItemMetadataCollector,
+                        didCollect metadataGroups: [AVDateRangeMetadataGroup],
+                        indexesOfNewGroups: IndexSet,
+                        indexesOfModifiedGroups: IndexSet) {
+        print(metadataGroups)
+        for metaDataGroup in metadataGroups {
+            for metadataitem in metaDataGroup.items {
+                onTimedMetadata?([
+                    "startDate": metaDataGroup.startDate.timeIntervalSince1970,
+                    "metadata": [[
+                        "identifier": metadataitem.key,
+                        "value": metadataitem.value,
+                    ]]
+                ])
+            }
+        }
+    }
+
     // MARK: - Player and source
 
     func preparePlayerItem() async throws -> AVPlayerItem {
@@ -559,6 +578,10 @@ class RCTVideo: UIView, RCTVideoPlayerViewControllerDelegate, RCTPlayerObserverH
             return
         }
 
+        metadataCollector = AVPlayerItemMetadataCollector()
+        metadataCollector.setDelegate(self, queue: DispatchQueue.main)
+        playerItem.add(metadataCollector)
+
         _player?.pause()
         _playerItem = playerItem
         _playerObserver.playerItem = _playerItem
@@ -610,7 +633,8 @@ class RCTVideo: UIView, RCTVideoPlayerViewControllerDelegate, RCTPlayerObserverH
                 // Set up your content playhead and contentComplete callback.
                 _contentPlayhead = IMAAVPlayerContentPlayhead(avPlayer: _player!)
 
-                _imaAdsManager.setUpAdsLoader()
+                _imaAdsManager?.setUpAdsLoader()
+                _didRequestAds = false
             }
         #endif
         isSetSourceOngoing = false
@@ -1000,7 +1024,9 @@ class RCTVideo: UIView, RCTVideoPlayerViewControllerDelegate, RCTPlayerObserverH
         setResizeMode(_resizeMode)
         setRepeat(_repeat)
         setControls(_controls)
-        setPaused(_paused)
+        #if !USE_GOOGLE_IMA
+            setPaused(_paused)
+        #endif
         setAllowsExternalPlayback(_allowsExternalPlayback)
 
         AudioSessionManager.shared.playerPropertiesChanged(view: self)
@@ -1429,6 +1455,14 @@ class RCTVideo: UIView, RCTVideoPlayerViewControllerDelegate, RCTPlayerObserverH
         // swiftlint:disable:next notification_center_detachment
         NotificationCenter.default.removeObserver(self)
 
+        
+        #if USE_GOOGLE_IMA
+            _imaAdsManager?.releaseAds()
+            _imaAdsManager = nil
+        #endif
+
+        ReactNativeVideoManager.shared.unregisterView(newInstance: self)
+            
         super.removeFromSuperview()
     }
 
@@ -1579,6 +1613,13 @@ class RCTVideo: UIView, RCTVideoPlayerViewControllerDelegate, RCTPlayerObserverH
             self._videoLoadStarted = false
             self._playerObserver.attachPlayerEventListeners()
             self.applyModifiers()
+            #if USE_GOOGLE_IMA
+                if !_didRequestAds && _source?.adParams.adTagUrl != nil  {
+                    _player?.rate = 0.0
+                    _imaAdsManager.requestAds()
+                    _didRequestAds = true
+                }
+            #endif
         }
     }
 

@@ -100,6 +100,8 @@
             // Mute ad if the main player is muted
             if _video.isMuted() {
                 adsManager.volume = 0
+            } else {
+                adsManager.volume = 1
             }
             // Play each ad once it has been loaded
             if event.type == IMAAdEventType.LOADED {
@@ -154,6 +156,7 @@
             // Pause the content for the SDK to play ads.
             _video?.setPaused(true)
             _video?.setAdPlaying(true)
+            adsManager.resume()
         }
 
         func adsManagerDidRequestContentResume(_: IMAAdsManager) {
