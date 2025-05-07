@@ -462,12 +462,14 @@ class RCTVideo: UIView, RCTVideoPlayerViewControllerDelegate, RCTPlayerObserverH
     var nextSource: NSDictionary?
 
     func applyNextSource() {
-        if self.nextSource != nil {
-            DebugLog("apply next source")
-            self.isSetSourceOngoing = false
-            let nextSrc = self.nextSource
-            self.nextSource = nil
-            self.setSrc(nextSrc)
+        DispatchQueue.main.async {
+            if self.nextSource != nil {
+                DebugLog("apply next source")
+                self.isSetSourceOngoing = false
+                let nextSrc = self.nextSource
+                self.nextSource = nil
+                self.setSrc(nextSrc)
+            }
         }
     }
 
@@ -1291,9 +1293,13 @@ class RCTVideo: UIView, RCTVideoPlayerViewControllerDelegate, RCTPlayerObserverH
     }
 
     func removePlayerLayer() {
-        _playerLayer?.removeFromSuperlayer()
-        _playerLayer = nil
-        _playerObserver.playerLayer = nil
+        let _playerObserver = self._playerObserver
+        let _playerLayer = self._playerLayer
+        self._playerLayer = nil
+        DispatchQueue.main.async {
+            _playerLayer?.removeFromSuperlayer()
+            _playerObserver.playerLayer = nil
+        }
     }
 
     @objc
